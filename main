@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>記憶與反應測試</title>
+    <style>
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f4f7f6; overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+        #game-container { text-align: center; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 90%; max-width: 500px; display: flex; flex-direction: column; justify-content: space-between; min-height: 550px; max-height: 90vh; overflow-y: auto;}
+        #step-setup { display: flex; flex-direction: column; gap: 10px; }
+        #display { font-size: 6rem; font-weight: bold; margin: 20px 0; height: 140px; color: #34495e; line-height: 140px; will-change: contents; transform: translateZ(0); }
+        .hidden { display: none !important; }
+        button { padding: 12px; font-size: 1.1rem; cursor: pointer; border: none; background: #4a90e2; color: white; border-radius: 10px; transition: 0.2s; font-weight: bold; width: 100%; margin: 5px 0; }
+        button:active { transform: scale(0.98); }
+        button:disabled { background: #cbd5e0; cursor: not-allowed; }
+        .input-group { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .input-group label { font-size: 1rem; color: #2d3748; font-weight: bold; text-align: left; flex: 1; }
+        input { padding: 10px; font-size: 1.2rem; width: 50%; text-align: center; border: 2px solid #e2e8f0; border-radius: 8px; outline: none; user-select: auto; -webkit-user-select: auto; }
+        input:focus { border-color: #4a90e2; }
+        .highlight { color: #ff4757; font-size: 7.5rem; }
+        .info { color: #7f8c8d; margin-bottom: 15px; font-size: 0.95rem; }
+        #memory-target { font-size: 2.5rem; letter-spacing: 5px; color: #2980b9; margin: 20px 0; font-weight: 900; word-break: break-all; min-height: 3rem; max-height: 150px; overflow-y: auto; }
+        #trigger-btn { background: #ff4757; height: 100px; width: 100px; border-radius: 50%; font-size: 1.2rem; margin: 0 auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 15px rgba(255, 71, 87, 0.4); user-select: none; -webkit-tap-highlight-color: transparent; cursor: pointer; transform: translateZ(0); }
+        #history-area { background: #f9fafb; padding: 15px; border-radius: 12px; border: 1px solid #edf2f7; text-align: left; margin-top: 15px; }
+        #history-title { font-size: 1.1rem; font-weight: bold; color: #2d3748; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }
+        #history-list { font-size: 0.9rem; color: #4a5568; max-height: 120px; overflow-y: auto; line-height: 1.6; }
+        .history-item { padding: 4px 0; border-bottom: 1px dashed #e2e8f0; white-space: nowrap; }
+        .history-controls { margin-top: 12px; display: flex; gap: 15px; font-size: 0.95rem; font-weight: bold; }
+        .history-link { color: #3182ce; cursor: pointer; text-decoration: underline; }
+        .history-link.clear { color: #e53e3e; }
+        .confirm-box { background: #f1f2f6; padding: 20px; border-radius: 15px; text-align: left; margin-bottom: 20px; }
+        .confirm-box p { margin: 10px 0; font-size: 1.2rem; color: #2c3e50; }
+        .confirm-box strong { color: #e74c3c; font-size: 1.4rem; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="step-setup">
+        <h2>測試參數設定</h2>
+        
+        <div class="input-group">
+            <label for="setup-target">反應目標數字:</label>
+            <input type="number" id="setup-target" min="1" max="9" pattern="[1-9]*" inputmode="numeric" oninput="validateInputs()">
+        </div>
+        
+        <div class="input-group">
+            <label for="setup-length">記憶數字長度:</label>
+            <input type="number" id="setup-length" min="1" inputmode="numeric" oninput="validateInputs()">
+        </div>
+        
+        <div class="input-group">
+            <label for="setup-time">記憶時間 (秒):</label>
+            <input type="number" id="setup-time" min="1" inputmode="numeric" oninput="validateInputs()">
+        </div>
+
+        <button id="btn-next" onclick="goToConfirm()" disabled>下一步</button>
+
+        <div id="history-area">
+            <div id="history-title">測試紀錄</div>
+            <div id="history-list"></div>
+            <div class="history-controls">
+                <span class="history-link" onclick="downloadCSV()">下載 CSV</span>
+                <span class="history-link clear" onclick="clearHistory()">清除紀錄</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="step-confirm" class="hidden">
+        <h2>確認測試資訊</h2>
+        <div class="confirm-box">
+            <p>數字長度：<strong id="confirm-length"></strong> 位</p>
+            <p>反應目標：<strong id="confirm-target"></strong></p>
+            <p>記憶時間：<strong id="confirm-time"></strong> 秒</p>
+        </div>
+        <button onclick="startMemorizing()">開始測試</button>
+    </div>
+
+    <div id="step-memorize" class="hidden">
+        <h2>請記下這 <span id="count-label"></span> 個數字</h2>
+        <div id="memory-target"></div>
+        <p class="info" style="margin-top: 10px; font-size: 1.1rem;">反應數字: <strong id="step1-target-reminder" style="color:#ff4757"></strong></p>
+        <div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 1.2rem; margin-top: 15px;">
+            剩餘記憶時間: <span id="countdown-display" style="font-size: 1.5rem; color: #d35400;"></span> 秒
+        </div>
+        <button onclick="skipTimer()" style="margin-top: 15px; background: #e67e22;">立即開始</button>
+    </div>
+
+    <div id="step-reaction" class="hidden">
+        <p class="info">看到 <strong id="info-target" style="color:#ff4757; font-size: 1.2rem;"></strong> 時請立即按紅色按鈕</p>
+        <div id="display">準備...</div>
+        <div id="trigger-btn" onmousedown="handleTrigger(event)" ontouchstart="handleTrigger(event)"> </div>
+    </div>
+
+    <div id="step-recall" class="hidden">
+        <h3>請輸入剛才記下的數字</h3>
+        <input type="number" id="user-input" pattern="\d*" autocomplete="off" style="width: 90%; letter-spacing: 4px; padding: 15px; font-size: 1.5rem;">
+        <br>
+        <button onclick="showFinalReport()">提交結果</button>
+    </div>
+
+    <div id="step-report" class="hidden">
+        <h2>測試分析報告</h2>
+        <div id="final-result" style="text-align: left; background: #f1f2f6; padding: 20px; border-radius: 15px; line-height: 1.8;"></div>
+        <br>
+        <button onclick="location.reload()">重新開始</button>
+    </div>
+</div>
+
+<script>
+    let targetNumbers = ""; 
+    let startTime = 0;      
+    let reactionTime = 0;   
+    let gameActive = false;
+    let rafId = null;
+    let memoryLength = 3;
+    let reactionTarget = 5;
+    let memoryTime = 5;
+    let targetHasAppeared = false; 
+    let countdownTimer = null;
+
+    window.onload = function() { displayHistory(); };
+
+    // 驗證三個輸入框是否都有填寫且合法
+    function validateInputs() {
+        const targetInput = document.getElementById('setup-target');
+        const lengthInput = document.getElementById('setup-length');
+        const timeInput = document.getElementById('setup-time');
+
+        // 過濾不合法字元
+        targetInput.value = targetInput.value.replace(/[^1-9]/g, '').slice(0, 1);
+        lengthInput.value = lengthInput.value.replace(/[^0-9]/g, '');
+        timeInput.value = timeInput.value.replace(/[^0-9]/g, '');
+
+        const isValid = targetInput.value !== "" && 
+                        lengthInput.value !== "" && parseInt(lengthInput.value) > 0 && 
+                        timeInput.value !== "" && parseInt(timeInput.value) > 0;
+
+        document.getElementById('btn-next').disabled = !isValid;
+
+        if (isValid) {
+            reactionTarget = parseInt(targetInput.value);
+            memoryLength = parseInt(lengthInput.value);
+            memoryTime = parseInt(timeInput.value);
+        }
+    }
+
+    // 進入確認頁面
+    function goToConfirm() {
+        document.getElementById('step-setup').classList.add('hidden');
+        document.getElementById('step-confirm').classList.remove('hidden');
+
+        document.getElementById('confirm-length').innerText = memoryLength;
+        document.getElementById('confirm-target').innerText = reactionTarget;
+        document.getElementById('confirm-time').innerText = memoryTime;
+    }
+
+    // 開始記憶與倒數
+    function startMemorizing() {
+        // 產生隨機目標數字
+        targetNumbers = "";
+        for(let i=0; i<memoryLength; i++) {
+            targetNumbers += Math.floor(Math.random() * 10).toString();
+        }
+        
+        document.getElementById('count-label').innerText = memoryLength;
+        document.getElementById('memory-target').innerText = targetNumbers;
+        document.getElementById('step1-target-reminder').innerText = reactionTarget;
+        
+        document.getElementById('step-confirm').classList.add('hidden');
+        document.getElementById('step-memorize').classList.remove('hidden');
+
+        // 開始倒數計時
+        let timeLeft = memoryTime;
+        document.getElementById('countdown-display').innerText = timeLeft;
+
+        countdownTimer = setInterval(() => {
+            timeLeft--;
+            document.getElementById('countdown-display').innerText = timeLeft;
+            
+            if (timeLeft <= 0) {
+                clearInterval(countdownTimer);
+                startDistraction(); // 倒數結束自動進入反應測試
+            }
+        }, 1000);
+    }
+
+    // 新增：使用者手動跳過計時，立即開始測試
+    function skipTimer() {
+        if (countdownTimer) {
+            clearInterval(countdownTimer);
+        }
+        startDistraction();
+    }
+
+    // 開始反應測試
+    function startDistraction() {
+        document.getElementById('step-memorize').classList.add('hidden');
+        document.getElementById('step-reaction').classList.remove('hidden');
+        document.getElementById('info-target').innerText = reactionTarget;
+
+        const displayDiv = document.getElementById('display');
+        gameActive = true;
+        targetHasAppeared = false; 
+        let tickCount = 0; 
+        
+        // 隨機決定目標出現的時機
+        let forcedTargetTick = Math.floor(Math.random() * 81) + 100;
+        
+        let lastTickTime = performance.now();
+
+        const tick = (currentTime) => {
+            if (!gameActive) return;
+
+            if (currentTime - lastTickTime >= 500) {
+                lastTickTime += 500; 
+                tickCount++;
+
+                if (tickCount === forcedTargetTick) {
+                    displayDiv.innerText = reactionTarget;
+                    displayDiv.className = 'highlight';
+                    startTime = currentTime; 
+                    targetHasAppeared = true; 
+                    return; 
+                } else {
+                    let currentNum = Math.floor(Math.random() * 9 + 1);
+                    if (currentNum === reactionTarget) {
+                        currentNum = (reactionTarget % 9) + 1;
+                    }
+                    displayDiv.innerText = currentNum;
+                    displayDiv.className = '';
+                }
+            }
+            rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+    }
+
+    // 處理按鈕反應
+    function handleTrigger(e) {
+        if (e) e.preventDefault();
+        if (!gameActive) return;
+        
+        if (targetHasAppeared) {
+            reactionTime = performance.now() - startTime;
+            gameActive = false;
+            cancelAnimationFrame(rafId);
+            document.getElementById('step-reaction').classList.add('hidden');
+            document.getElementById('step-recall').classList.remove('hidden');
+            setTimeout(() => document.getElementById('user-input').focus(), 200);
+        }
+    }
+
+    // 監聽空白鍵
+    window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleTrigger(e); });
+
+    // 顯示最終報告
+    function showFinalReport() {
+        const userInput = document.getElementById('user-input').value;
+        document.getElementById('step-recall').classList.add('hidden');
+        document.getElementById('step-report').classList.remove('hidden');
+        
+        let correctCount = 0;
+        let compareLength = Math.max(memoryLength, userInput.length);
+        for(let i=0; i < compareLength; i++) {
+            if(userInput[i] === targetNumbers[i]) correctCount++;
+        }
+        let accuracy = ((correctCount / memoryLength) * 100).toFixed(1);
+        // 防呆，最高100%
+        if(accuracy > 100) accuracy = 100;
+
+        saveResult(memoryLength, reactionTarget, reactionTime.toFixed(0), accuracy);
+        
+        document.getElementById('final-result').innerHTML = `
+            <strong>◎ 反應速度:</strong><br>
+            <span style="color:#ff4757; font-size:1.4rem; font-weight:bold;">${reactionTime.toFixed(0)} ms</span><br><br>
+            <strong>◎ 記憶準確度 (${memoryLength}位):</strong><br>
+            正確答案：<span style="word-break:break-all; font-family: monospace;">${targetNumbers}</span><br>
+            你的輸入：<span style="word-break:break-all; font-family: monospace;">${userInput || "無"}</span><br>
+            準確率：<span style="color:#4a90e2; font-size:1.4rem; font-weight:bold;">${accuracy}%</span>
+        `;
+    }
+
+    function saveResult(len, target, rt, acc) {
+        let history = JSON.parse(localStorage.getItem('reactionGameHistory') || '[]');
+        const now = new Date();
+        const timeStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
+        history.unshift({ time: timeStr, len: len, target: target, rt: rt, acc: acc });
+        localStorage.setItem('reactionGameHistory', JSON.stringify(history));
+    }
+
+    function displayHistory() {
+        let history = JSON.parse(localStorage.getItem('reactionGameHistory') || '[]');
+        const list = document.getElementById('history-list');
+        if (history.length === 0) { list.innerHTML = '<div style="text-align:center; padding:10px; color:#a0aec0;">尚無測試紀錄</div>'; return; }
+        list.innerHTML = history.slice(0, 10).map(h => `
+            <div class="history-item">${h.time.split(' ')[1]} | ${h.len}位數 | ${h.rt}ms | ${h.acc}%正確</div>
+        `).join('');
+    }
+
+    function downloadCSV() {
+        let history = JSON.parse(localStorage.getItem('reactionGameHistory') || '[]');
+        if (history.length === 0) { alert('沒有紀錄可供下載'); return; }
+        let csvContent = "\uFEFF時間,記憶位數,目標數字,反應時間(ms),正確率(%)\n";
+        history.forEach(h => {
+            csvContent += `${h.time},${h.len},${h.target},${h.rt},${h.acc}\n`;
+        });
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "測試紀錄_反應與記憶.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function clearHistory() {
+        if(confirm('確定要清除所有測試紀錄嗎？')) {
+            localStorage.removeItem('reactionGameHistory');
+            displayHistory();
+        }
+    }
+</script>
+</body>
+</html>
